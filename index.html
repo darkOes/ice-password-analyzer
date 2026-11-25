@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICE Password Analyzer // darkOes</title>
+<meta name="description" content="Offline password strength analyzer: entropy, crack-time estimates and pattern detection. Nothing leaves your browser.">
+<meta name="theme-color" content="#05080c">
+<style>
+  :root{--bg:#05080c;--panel:#0b1118;--line:#1d2a36;--fg:#c9d1d9;--w:#e6edf3;--y:#FCEE0A;--c:#00F0FF;--r:#FF2A6D;--g:#39FF14;--o:#ff9f1c;--m:#6b7a86}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 'JetBrains Mono','Fira Code',Consolas,'Courier New',monospace}
+  body{min-height:100vh;background:radial-gradient(ellipse at 20% 0%,rgba(0,240,255,.07),transparent 60%),var(--bg)}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);z-index:50}
+  a{color:var(--c)}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);font-size:12px}
+  header a{text-decoration:none} header .brand{color:var(--y);letter-spacing:2px}
+  main{max-width:960px;margin:0 auto;padding:24px 16px 48px}
+  h1{margin:0;color:var(--c);font-size:clamp(24px,5vw,40px);letter-spacing:2px;text-shadow:0 0 14px rgba(0,240,255,.45)}
+  .sub{color:var(--y);letter-spacing:3px;font-size:12px;margin:4px 0 20px}
+  .privacy{border:1px solid rgba(57,255,20,.35);color:var(--g);padding:8px 12px;font-size:12px;margin-bottom:18px}
+  .inputrow{display:flex;gap:8px}
+  input[type=text],input[type=password]{flex:1;min-width:0;font:inherit;font-size:18px;background:#03060a;color:var(--w);border:1px solid var(--c);padding:12px 14px;outline:none;caret-color:var(--y)}
+  input:focus{box-shadow:0 0 0 1px var(--c),0 0 18px rgba(0,240,255,.25)}
+  button{font:inherit;background:transparent;color:var(--y);border:1px solid var(--y);padding:8px 14px;cursor:pointer;letter-spacing:1px;white-space:nowrap}
+  button:hover{background:var(--y);color:#000}
+  .meter{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:16px 0 6px}
+  .meter i{height:10px;background:#141d26;transition:background .2s,box-shadow .2s}
+  .rating{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  .rating b{font-size:22px;letter-spacing:3px}
+  .rating span{color:var(--m);font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}.inputrow{flex-wrap:wrap}}
+  .panel{border:1px solid var(--line);background:var(--panel)}
+  .panel h2{margin:0;padding:7px 12px;font-size:12px;letter-spacing:2px;color:#000;background:var(--c)}
+  .panel.y h2{background:var(--y)}
+  .panel .body{padding:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  td:last-child{text-align:right;color:var(--w)}
+  tr:last-child td{border:0}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12px;padding:2px 8px;border:1px solid #2b3946;color:var(--m)}
+  .chip.on{border-color:var(--c);color:var(--c)}
+  ul.f{margin:0;padding-left:0;list-style:none;font-size:13px}
+  ul.f li{padding:5px 0 5px 22px;position:relative;border-bottom:1px solid var(--line)}
+  ul.f li:last-child{border:0}
+  ul.f li::before{position:absolute;left:0;top:5px}
+  ul.f li.bad::before{content:"✕";color:var(--r)} ul.f li.warn::before{content:"!";color:var(--o)} ul.f li.good::before{content:"✓";color:var(--g)}
+  .gen{display:flex;flex-direction:column;gap:10px}
+  .gen output{display:block;word-break:break-all;background:#03060a;border:1px dashed var(--y);padding:10px;color:var(--y);min-height:44px}
+  .gen .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
+  .gen input[type=range]{accent-color:var(--y)}
+  .empty{color:var(--m);font-size:13px}
+  footer{text-align:center;color:var(--m);font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="https://darkoes.github.io/">← darkOes.exe</a>
+  <a href="https://github.com/darkOes/ice-password-analyzer">source code ↗</a>
+</header>
+<main>
+  <h1>ICE_PASSWORD_ANALYZER</h1>
+  <div class="sub">// HOW LONG WOULD YOUR ICE HOLD AGAINST A NETRUNNER?</div>
+  <div class="privacy">🔒 100% offline. Your password is analyzed in this tab only. No network requests, no storage, no logging.</div>
+
+  <div class="inputrow">
+    <input id="pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type a password to analyze..." aria-label="password">
+    <button id="toggle" type="button">SHOW</button>
+  </div>
+  <div class="meter" id="meter"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="rating"><b id="rating" style="color:var(--m)">NO ICE</b><span id="entropy">entropy: 0 bits</span></div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>TIME TO CRACK</h2>
+      <div class="body"><table id="crack"></table></div>
+    </section>
+    <section class="panel">
+      <h2>COMPOSITION</h2>
+      <div class="body">
+        <div class="chips" id="chips"></div>
+        <table id="comp" style="margin-top:10px"></table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>FINDINGS</h2>
+      <div class="body"><ul class="f" id="findings"><li class="empty" style="padding-left:0">waiting for input...</li></ul></div>
+    </section>
+    <section class="panel y">
+      <h2>GENERATE STRONG ICE</h2>
+      <div class="body gen">
+        <output id="genOut">—</output>
+        <div class="row">
+          <button id="genPass" type="button">RANDOM</button>
+          <button id="genPhrase" type="button">PASSPHRASE</button>
+          <button id="useGen" type="button">ANALYZE IT</button>
+        </div>
+        <div class="row"><label for="len">length</label><input id="len" type="range" min="12" max="40" value="20"><span id="lenV">20</span></div>
+        <div class="row" style="color:var(--m)">uses crypto.getRandomValues()</div>
+      </div>
+    </section>
+  </div>
+</main>
+<footer>built by <a href="https://github.com/darkOes">darkOes</a> // estimates are approximations, not guarantees // never fade away 🌙</footer>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  // Small built-in lists (real-world top passwords + common words). Kept short on purpose.
+  const COMMON = ('123456 password 123456789 12345678 12345 qwerty 1234567 111111 123123 abc123 password1 1234 iloveyou 1q2w3e4r 000000 qwerty123 ' +
+    'zaq12wsx dragon sunshine princess letmein 654321 monkey 27653 1qaz2wsx 123321 qwertyuiop superman asdfghjkl trustno1 football baseball ' +
+    'welcome admin login master hello freedom whatever shadow michael jordan23 starwars passw0rd qazwsx 666666 121212 batman ninja mustang ' +
+    'access flower hottie loveme zxcvbnm 7777777 charlie donald aa123456 polska haslo haslo123 kochamcie zaq1 misiek marcin bartek ' +
+    'qwe123 test123 changeme secret root toor default guest cyberpunk netrunner').split(' ');
+  const WORDS = ('love hate dark night city cyber punk dragon tiger lion angel devil king queen star moon sun summer winter spring autumn ' +
+    'football soccer gamer pass word secret money admin user login hello world magic music rock metal blue red green black white ' +
+    'monkey shadow master super hero power ninja killer hunter wolf fire ice storm thunder chrome neon matrix hacker kocham polska ' +
+    'misiek kotek piesek haslo').split(' ');
+  const KEYROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm', '1234567890', 'qwertzuiop', 'azertyuiop', '1qaz2wsx3edc', 'zaq12wsx'];
+  const LEET = {'0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '@': 'a', '$': 's', '!': 'i'};
+  const PHRASE_WORDS = ('amber anchor apex arcade atlas aurora binary blade blaze bolt cable canyon carbon cascade cipher circuit cobalt comet ' +
+    'copper coral cosmic crimson crystal cyan delta drift echo ember engine falcon fiber flare flux forge fractal galaxy ghost glacier ' +
+    'glitch gravity harbor helix horizon hydra ion iris jade jet karma kernel kinetic laser lattice lumen lunar magnet marble meteor ' +
+    'mirror module nebula neon nexus nova oasis obsidian omega onyx orbit oxide pixel plasma prism proxy pulse quartz quantum radar ' +
+    'raven relay rocket rogue rune saber shard signal silicon solar sonic spectre static stealth summit syntax tempest titan token ' +
+    'torch vector velvet vertex violet vortex voxel warden wave zenith zephyr').split(' ');
+
+  const GUESS_RATES = [
+    ['online, throttled (100/h)', 100 / 3600],
+    ['online, no limit (10/s)', 10],
+    ['offline, slow hash (bcrypt, 10k/s)', 1e4],
+    ['offline, fast hash (GPU, 10B/s)', 1e10],
+  ];
+
+  function analyze(pw) {
+    const findings = [];
+    const lower = pw.toLowerCase();
+    const deleet = lower.replace(/[0134578@$!]/g, ch => LEET[ch] || ch);
+    const sets = {
+      lower: /[a-z]/.test(pw), upper: /[A-Z]/.test(pw), digit: /\d/.test(pw),
+      symbol: /[^A-Za-z0-9\s]/.test(pw), space: /\s/.test(pw), unicode: /[^\x00-\x7F]/.test(pw),
+    };
+    let pool = 0;
+    if (sets.lower) pool += 26; if (sets.upper) pool += 26; if (sets.digit) pool += 10;
+    if (sets.symbol) pool += 33; if (sets.space) pool += 1; if (sets.unicode) pool += 100;
+    const len = [...pw].length;
+    let bits = len ? len * Math.log2(Math.max(pool, 2)) : 0;
+
+    // pattern penalties: we lower the effective entropy when a guesser would find it fast
+    const embedded = COMMON.filter(c => c.length >= 5 && (lower.includes(c) || deleet.includes(c))).sort((a, b) => b.length - a.length)[0];
+    if (COMMON.includes(lower) || COMMON.includes(deleet)) {
+      bits = Math.min(bits, 10);
+      findings.push(['bad', 'In the list of the most common leaked passwords. Cracked instantly.']);
+    } else if (embedded) {
+      // a known leaked password + a few extra characters: crackers try exactly this (wordlist + rules)
+      const rest = Math.max(0, len - embedded.length);
+      bits = Math.min(bits, 14 + rest * Math.log2(Math.max(pool, 2)) * 0.6);
+      findings.push(['bad', `Built on the leaked password "${embedded}"` + (deleet !== lower ? ' with leetspeak swaps' : '') + '. Wordlist + rules attacks crack this fast.']);
+    }
+    const words = embedded ? [] : WORDS.filter(w => w.length >= 4 && deleet.includes(w));
+    if (words.length) {
+      bits -= words.reduce((s, w) => s + (w.length * Math.log2(26) - 11), 0);
+      findings.push(['warn', `Contains dictionary words: ${[...new Set(words)].slice(0, 4).join(', ')}.` + (deleet !== lower ? ' Leetspeak (p4ssw0rd) does not hide them.' : '')]);
+    }
+    for (const row of KEYROWS) {
+      for (let k = row.length; k >= 4; k--) {
+        let hit = false;
+        for (let i = 0; i + k <= row.length; i++) {
+          const part = row.slice(i, i + k);
+          if (lower.includes(part) || lower.includes([...part].reverse().join(''))) { hit = part; break; }
+        }
+        if (hit) { bits -= k * 2.5; findings.push(['warn', `Keyboard pattern "${hit}" — first thing a cracker tries.`]); break; }
+      }
+    }
+    const rep = pw.match(/(.)\1{2,}/);
+    if (rep) { bits -= rep[0].length * 2; findings.push(['warn', `Repeated characters "${rep[0]}".`]); }
+    const seq = findSequence(lower);
+    if (seq) { bits -= seq.length * 2.5; findings.push(['warn', `Sequence "${seq}" (abc / 123).`]); }
+    const year = pw.match(/(19[5-9]\d|20[0-4]\d)/);
+    if (year) { bits -= 6; findings.push(['warn', `Looks like a year (${year[0]}). Dates are guessable, especially birthdays.`]); }
+    if (/^[A-Z][a-z]+\d{1,4}[!.?]?$/.test(pw)) { bits -= 8; findings.push(['warn', 'Classic "Word123!" shape. Crackers have rules exactly for this.']); }
+
+    bits = Math.max(0, bits);
+    if (len && len < 8) findings.push(['bad', `Only ${len} characters. Use at least 12, ideally 16+.`]);
+    else if (len >= 16) findings.push(['good', `Length ${len} — length is the strongest defense.`]);
+    else if (len >= 12) findings.push(['good', `Decent length (${len}).`]);
+    const kinds = ['lower', 'upper', 'digit', 'symbol'].filter(k => sets[k]).length;
+    if (len && kinds <= 1) findings.push(['warn', 'Only one character type. Mixing types (or going much longer) helps.']);
+    if (kinds >= 3 && len >= 12 && bits >= 60) findings.push(['good', 'Good mix of character types.']);
+    if (bits >= 80) findings.push(['good', 'Out of reach for brute force with today’s hardware.']);
+    if (len) findings.push(['warn', 'Never reuse it on other sites — breaches leak passwords, not just hashes.']);
+
+    const score = bits < 28 ? 0 : bits < 40 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
+    return {bits, pool, len, sets, findings, score};
+  }
+
+  function findSequence(s) {
+    let best = '';
+    for (let i = 0; i < s.length; i++) {
+      let j = i;
+      while (j + 1 < s.length && (s.charCodeAt(j + 1) - s.charCodeAt(j) === 1 || s.charCodeAt(j + 1) - s.charCodeAt(j) === -1)) j++;
+      if (j - i + 1 > best.length) best = s.slice(i, j + 1);
+    }
+    return best.length >= 4 ? best : '';
+  }
+
+  function human(sec) {
+    if (!isFinite(sec) || sec > 1e15 * 3.15e7) return '∞ (heat death of the universe)';
+    if (sec < 1) return 'instant';
+    const units = [['century', 3.15e9], ['year', 3.15e7], ['month', 2.6e6], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+    for (const [u, s] of units) if (sec >= s) {
+      const v = sec / s;
+      const n = v >= 1e6 ? v.toExponential(1) : Math.round(v).toLocaleString('en');
+      const label = Math.round(v) === 1 ? u : (u === 'century' ? 'centuries' : u + 's');
+      return `${n} ${label}`;
+    }
+  }
+
+  const LEVELS = [
+    ['NO ICE', 'var(--r)'], ['WEAK ICE', 'var(--r)'], ['STANDARD ICE', 'var(--o)'], ['MILITECH ICE', 'var(--y)'], ['BLACK ICE', 'var(--g)'],
+  ];
+
+  function render() {
+    const pw = $('pw').value;
+    const a = analyze(pw);
+    const [label, color] = pw ? LEVELS[a.score] : ['NO INPUT', 'var(--m)'];
+    $('rating').textContent = label; $('rating').style.color = color;
+    $('entropy').textContent = `effective entropy: ${a.bits.toFixed(1)} bits`;
+    [...$('meter').children].forEach((el, i) => {
+      const on = pw && i <= a.score;
+      el.style.background = on ? color : '#141d26';
+      el.style.boxShadow = on ? `0 0 10px ${color}` : 'none';
+    });
+    const guesses = Math.pow(2, a.bits) / 2;
+    $('crack').innerHTML = GUESS_RATES.map(([n, r]) => `<tr><td>${n}</td><td>${pw ? human(guesses / r) : '—'}</td></tr>`).join('');
+    const names = {lower: 'a-z', upper: 'A-Z', digit: '0-9', symbol: '#$%', space: 'space', unicode: 'unicode'};
+    $('chips').innerHTML = Object.entries(names).map(([k, n]) => `<span class="chip ${a.sets[k] ? 'on' : ''}">${n}</span>`).join('');
+    $('comp').innerHTML = `<tr><td>length</td><td>${a.len}</td></tr><tr><td>character pool</td><td>${a.pool}</td></tr>` +
+      `<tr><td>raw entropy</td><td>${(a.len * Math.log2(Math.max(a.pool, 2)) * (a.len ? 1 : 0)).toFixed(1)} bits</td></tr>`;
+    $('findings').innerHTML = pw ? a.findings.map(([t, m]) => `<li class="${t}">${escapeHtml(m)}</li>`).join('') : '<li class="empty" style="padding-left:0">waiting for input...</li>';
+  }
+  const escapeHtml = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+  // generator
+  const rand = n => { const lim = Math.floor(2 ** 32 / n) * n; let x; do { x = crypto.getRandomValues(new Uint32Array(1))[0]; } while (x >= lim); return x % n; };
+  function genPassword(len) {
+    const sets = ['abcdefghijkmnopqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '!@#$%^&*-_=+?'];
+    const all = sets.join('');
+    const out = sets.map(s => s[rand(s.length)]);
+    while (out.length < len) out.push(all[rand(all.length)]);
+    for (let i = out.length - 1; i > 0; i--) { const j = rand(i + 1); [out[i], out[j]] = [out[j], out[i]]; }
+    return out.join('');
+  }
+  function genPhrase() {
+    const n = 5; const w = [];
+    for (let i = 0; i < n; i++) w.push(PHRASE_WORDS[rand(PHRASE_WORDS.length)]);
+    return w.join('-') + '-' + (rand(90) + 10);
+  }
+  $('len').oninput = () => { $('lenV').textContent = $('len').value; };
+  $('genPass').onclick = () => { $('genOut').textContent = genPassword(+$('len').value); };
+  $('genPhrase').onclick = () => { $('genOut').textContent = genPhrase(); };
+  $('useGen').onclick = () => { const v = $('genOut').textContent; if (v && v !== '—') { $('pw').value = v; render(); } };
+  $('toggle').onclick = () => { const t = $('pw').type === 'password'; $('pw').type = t ? 'text' : 'password'; $('toggle').textContent = t ? 'HIDE' : 'SHOW'; };
+  $('pw').addEventListener('input', render);
+  render();
+})();
+</script>
+</body>
+</html>
